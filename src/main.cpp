@@ -4,6 +4,7 @@
 #include <demos/lv_demos.h>
 #include "CST816S.h"
 #include "pins_arduino.h"
+#include "ui.h"
 #include <Wire.h>  // Add Wire library for I2C communication
 
 #define EXAMPLE_LVGL_TICK_PERIOD_MS 2
@@ -27,6 +28,31 @@ void my_print(const char *buf) {
   Serial.flush();
 }
 #endif
+
+
+void PID_Data_Send(void *arg)
+{
+  while (1)
+  {
+    if(PID_Data.send_flag == 1)
+    {
+      PID_Data.send_flag=0;
+      Serial.printf("PID:%.2f,%.2f,%.2f,#\r\n", PID_Data.p_value, PID_Data.i_value, PID_Data.d_value);
+    }
+    else if (PID_Data.send_flag == 2)
+    {
+      Serial.printf("PID:%.2f,%.2f,%.2f,#\r\n", PID_Data.p_value, PID_Data.i_value, PID_Data.d_value);
+    }
+
+    vTaskDelay(20 / portTICK_RATE_MS);
+  }
+  
+
+
+
+
+}
+
 
 /* Display flushing */
 void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
@@ -67,6 +93,7 @@ void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
   } else {
     data->state = LV_INDEV_STATE_PR;
 
+
     /* Set the coordinates */
     data->point.x = touch.data.x;
     data->point.y = touch.data.y;
@@ -82,82 +109,6 @@ void my_touchpad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data) {
 
 
 
-// SCREEN: ui_Screen1
-void ui_Screen1_screen_init(void);
-lv_obj_t * ui_Screen1;
-lv_obj_t * ui_Keyboard1;
-lv_obj_t * ui_Arc1;
-lv_obj_t * ui_Button2;
-lv_obj_t * ui_Checkbox1;
-lv_obj_t * ui____initial_actions0;
-
-///////////////////// TEST LVGL SETTINGS ////////////////////
-#if LV_COLOR_DEPTH != 16
-    #error "LV_COLOR_DEPTH should be 16bit to match SquareLine Studio's settings"
-#endif
-#if LV_COLOR_16_SWAP !=0
-    #error "LV_COLOR_16_SWAP should be 0 to match SquareLine Studio's settings"
-#endif
-
-///////////////////// ANIMATIONS ////////////////////
-
-///////////////////// FUNCTIONS ////////////////////
-
-///////////////////// SCREENS ////////////////////
-
-void ui_init(void)
-{
-    lv_disp_t * dispp = lv_disp_get_default();
-    lv_theme_t * theme = lv_theme_default_init(dispp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_RED),
-                                               true, LV_FONT_DEFAULT);
-    lv_disp_set_theme(dispp, theme);
-    ui_Screen1_screen_init();
-    ui____initial_actions0 = lv_obj_create(NULL);
-    lv_disp_load_scr(ui_Screen1);
-}
-
-
-
-
-
-void ui_Screen1_screen_init(void)
-{
-    ui_Screen1 = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_Screen1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-
-    ui_Keyboard1 = lv_keyboard_create(ui_Screen1);
-    lv_obj_set_width(ui_Keyboard1, 217);
-    lv_obj_set_height(ui_Keyboard1, 120);
-    lv_obj_set_x(ui_Keyboard1, -2);
-    lv_obj_set_y(ui_Keyboard1, 75);
-    lv_obj_set_align(ui_Keyboard1, LV_ALIGN_CENTER);
-
-    ui_Arc1 = lv_arc_create(ui_Screen1);
-    lv_obj_set_width(ui_Arc1, 120);
-    lv_obj_set_height(ui_Arc1, 123);
-    lv_obj_set_x(ui_Arc1, -35);
-    lv_obj_set_y(ui_Arc1, -56);
-    lv_obj_set_align(ui_Arc1, LV_ALIGN_CENTER);
-    lv_arc_set_value(ui_Arc1, 50);
-
-
-    ui_Button2 = lv_btn_create(ui_Screen1);
-    lv_obj_set_width(ui_Button2, 55);
-    lv_obj_set_height(ui_Button2, 50);
-    lv_obj_set_x(ui_Button2, 73);
-    lv_obj_set_y(ui_Button2, -100);
-    lv_obj_set_align(ui_Button2, LV_ALIGN_CENTER);
-
-    ui_Checkbox1 = lv_checkbox_create(ui_Screen1);
-    lv_obj_set_width(ui_Checkbox1, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_Checkbox1, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Checkbox1, 56);
-    lv_obj_set_y(ui_Checkbox1, 2);
-    lv_obj_set_align(ui_Checkbox1, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_Checkbox1, LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
-
-
-}
 
 
 void setup() {
@@ -181,7 +132,7 @@ void setup() {
 
   // Initialize I2C
   Wire.begin(11, 10);
-  Wire.setClock(400000);
+  // Wire.setClock(400000);
   // Check devices connected to I2C bus
   byte error, address;
   bool foundDevice = false;
@@ -257,15 +208,23 @@ void setup() {
 
   /* Or try out a demo. Don't forget to enable the demos in lv_conf.h. E.g. LV_USE_DEMOS_WIDGETS */
 
-  ui_init();
+
   if (foundDevice) {
-    ui_Screen1_screen_init();
+    ui_init();
+    // ui_PIDTUNNER_screen_init();
     // lv_demo_widgets();
     // lv_demo_benchmark();
   }
 
   Serial.println("Setup done");
+
+  xTaskCreate(PID_Data_Send, "PID_Tunner_Loop", 4096, NULL, 1, NULL);
+  
+
+
 }
+
+
 
 void loop() {
   lv_timer_handler(); /* let the GUI do its work */
